@@ -179,8 +179,11 @@ resolved to DSH ACP `0.1.5-rc.2` and ACP SDK `1.4.0`.
 
 Separately, an installed macOS Paseo 0.8.0 daemon completed real turns and kept
 tool-output tails, prior displayed history and DSH context through a plugin
-disable/enable cycle. That cycle also exposed a host IPC shutdown race; its
-remediation and final verification are tracked in [verification](docs/verification.md).
+disable/enable cycle. An initial host IPC shutdown race was fixed by explicit
+async cleanup ownership; the repeated installed cycle had no new IPC errors,
+and the following real turn retained context and history. The **19-test** suite
+includes pending-connect and close-ordering regressions; exact evidence is
+tracked in [verification](docs/verification.md).
 These are backend tests, not a desktop UI matrix or mobile-device test. Official DSH does not provide raw token deltas,
 provider-specific commands, steering, transcript replay, or its own plan/
 terminal UI surfaces; those are not claimed by this plugin. Credentials and
