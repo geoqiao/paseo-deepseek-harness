@@ -1,5 +1,8 @@
 # DeepSeek Harness for Paseo
 
+> [!IMPORTANT]
+> **This plugin has moved to [geoqiao/paseo-stuff → plugins/deepseek-harness](https://github.com/geoqiao/paseo-stuff/tree/main/plugins/deepseek-harness).** New development, issues and releases belong there. The plugin ID remains `deepseek-harness`. This repository and its existing tags are retained for earlier installations; the content below describes those historical releases. Existing Git installations do not switch remotes automatically. Read the [migration notes](https://github.com/geoqiao/paseo-stuff/blob/main/MIGRATION.md) before changing sources. Finish active DSH work first; avoid duplicate installations and preserve intentional disablement.
+
 **Use the official DeepSeek Harness in Paseo — with native context resume and complete tool results.**
 
 A community-maintained Paseo 0.8 provider plugin, not a replacement agent loop
