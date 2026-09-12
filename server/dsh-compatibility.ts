@@ -78,7 +78,9 @@ export function assertSupportedNodeVersion(version = process.versions.node): voi
 }
 
 export function extractDshVersion(output: string): string | undefined {
-  return /(?:^|[^0-9A-Za-z.-])((?:[0-9]+)\.(?:[0-9]+)\.(?:[0-9]+)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))(?=$|[^0-9A-Za-z.-])/.exec(
+  // Include stable releases and build metadata in diagnostics; never accept a
+  // tested prefix of an otherwise untested version such as rc.2+custom.
+  return /(?:^|[^0-9A-Za-z.+_-])([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)(?=$|[^0-9A-Za-z.+_-])/.exec(
     output,
   )?.[1];
 }
@@ -96,7 +98,9 @@ export function redactDiagnostic(value: string): string {
   return value
     .replace(ANSI_ESCAPE_RE, "")
     .replace(
-      /((?:api[_-]?key|authorization|bearer|token|secret|password|cookie)\s*[:=]\s*)(?:Bearer\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
+      // Accept JSON/log key quotes and the common "API key" spelling.
+      // Consume escaped quotes too, rather than leaking the rest of a value.
+      /(["']?(?:api[ _-]?key|authorization|bearer|token|secret|password|cookie)["']?\s*[:=]\s*)(?:Bearer\s+)?(?:"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[^\s,;]+)/gi,
       "$1[redacted]",
     )
     .replace(/(Bearer\s+)[^\s]+/gi, "$1[redacted]")
@@ -794,7 +798,7 @@ async function probeDshVersion(
       windowsHide: true,
     });
   } catch (error) {
-    throw missingExecutableError(command, error);
+    throw launchPathError(command, cwd, error);
   }
 
   const stdout = new BoundedCapture(STDERR_CAPTURE_LIMIT);
@@ -808,8 +812,8 @@ async function probeDshVersion(
     const result = await waitForProbe(child);
     assertConnectorOpen(context, "during version probe");
     if (result.error) {
-      if (isMissingExecutableError(result.error)) {
-        throw missingExecutableError(command, result.error);
+      if (isMissingPathError(result.error)) {
+        throw launchPathError(command, cwd, result.error);
       }
       throw new Error(
         "DeepSeek Harness version probe could not run " +
@@ -869,10 +873,11 @@ interface ProbeResult {
 function waitForProbe(child: ChildProcess): Promise<ProbeResult> {
   return new Promise((resolve) => {
     let settled = false;
+    let timedOut = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let spawnError: Error | undefined;
 
-    const finish = (result: ProbeResult): void => {
+    const finish = (result: Omit<ProbeResult, "timedOut">): void => {
       if (settled) {
         return;
       }
@@ -880,29 +885,34 @@ function waitForProbe(child: ChildProcess): Promise<ProbeResult> {
       if (timer) {
         clearTimeout(timer);
       }
-      resolve(result);
+      child.off("error", onError);
+      child.off("close", onClose);
+      resolve({ ...result, timedOut });
     };
 
-    child.once("error", (error) => {
+    const onError = (error: Error): void => {
       spawnError = asError(error);
       if (child.exitCode !== null || child.signalCode !== null) {
         finish({
           code: child.exitCode,
           signal: child.signalCode,
           error: spawnError,
-          timedOut: false,
         });
       }
-    });
-    child.once("close", (code, signal) => {
+    };
+    const onClose = (code: number | null, signal: NodeJS.Signals | null): void => {
       finish({
         code,
         signal,
         error: spawnError,
-        timedOut: false,
       });
-    });
+    };
+    child.once("error", onError);
+    child.once("close", onClose);
     timer = setTimeout(() => {
+      // The cleanup-triggered close event normally wins this race. Latch the
+      // deadline first so exit 143/SIGTERM cannot conceal the timeout cause.
+      timedOut = true;
       void terminateChild(child, () => child.exitCode !== null || child.signalCode !== null)
         .catch(() => undefined)
         .finally(() =>
@@ -910,11 +920,9 @@ function waitForProbe(child: ChildProcess): Promise<ProbeResult> {
             code: child.exitCode,
             signal: child.signalCode,
             error: spawnError,
-            timedOut: true,
           }),
         );
     }, VERSION_PROBE_TIMEOUT_MS);
-
   });
 }
 
@@ -1012,18 +1020,16 @@ function waitForChildClose(
   });
 }
 
-function isMissingExecutableError(error: Error): boolean {
-  return (
-    (error as NodeJS.ErrnoException).code === "ENOENT" ||
-    error.message.includes("ENOENT")
-  );
+function isMissingPathError(error: Error): boolean {
+  return (error as NodeJS.ErrnoException).code === "ENOENT";
 }
 
-function missingExecutableError(command: string, cause: unknown): Error {
+function launchPathError(command: string, cwd: string, cause: unknown): Error {
   return new Error(
-    "DeepSeek Harness executable " +
+    "DeepSeek Harness could not start executable " +
       command +
-      " was not found. Install the official DeepSeek Harness package or set DSH_PASEO_COMMAND to an executable path; this plugin never invokes a shell.",
+      " in working directory " + cwd +
+      ". Check that both the executable and working directory exist. Install the official DeepSeek Harness package or set DSH_PASEO_COMMAND to an executable path if needed; this plugin never invokes a shell.",
     { cause },
   );
 }

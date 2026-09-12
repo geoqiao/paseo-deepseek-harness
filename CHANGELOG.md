@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-beta.2
+
+- Follow-up to a separate code review; see `docs/code-review.md`.
+- Redact JSON-quoted and space-separated credential labels in startup diagnostics,
+  including escaped quoted values. Tests use synthetic secrets only.
+- Preserve the version-probe timeout cause instead of reporting its cleanup exit.
+- Report missing executable/cwd ambiguity honestly, and identify stable/build
+  versions without accepting an untested prefix.
+- Remove a redundant connection reference and clarify environment propagation.
+- Typecheck/lint and 32 tests pass, including 13 additional regression cases.
+
 ## 0.1.0-beta.1
 
 Initial beta release.

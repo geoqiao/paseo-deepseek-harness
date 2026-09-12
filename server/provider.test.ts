@@ -72,6 +72,26 @@ afterAll(async () => {
 });
 
 describe.sequential("DeepSeek Harness provider", () => {
+  it.each([0, -1, NaN, Infinity])("rejects invalid startup timeout %s before connecting", (startupTimeoutMs) => {
+    expect(() => createDeepSeekHarnessProvider({ startupTimeoutMs })).toThrow("must be positive");
+  });
+
+  it("rejects command prompts even if a caller ignores advertised capabilities", async () => {
+    const provider = createDeepSeekHarnessProvider();
+    const connection = await provider.connect(connectRequest());
+    try {
+      await expect(connection.send({
+        type: "session.prompt", sessionId: "not-opened",
+        prompt: {
+          clientMessageId: "command-test", delivery: "auto",
+          input: { type: "command", name: "unsupported", arguments: "" },
+        },
+      })).rejects.toThrow("does not support provider commands");
+    } finally {
+      await provider.dispose();
+    }
+  });
+
   it("registers the true server provider entry and exposes the managed factory", async () => {
     const registerProvider = vi.fn();
     const cleanup = serverEntry({
@@ -821,7 +841,7 @@ describe.sequential("DeepSeek Harness provider", () => {
     await withEnvironment({ DSH_PASEO_COMMAND: "/missing/dsh" }, async () => {
       const provider = createDeepSeekHarnessProvider({ startupTimeoutMs: 500 });
       await expect(provider.connect(connectRequest())).rejects.toThrow(
-        "was not found",
+        "Check that both the executable and working directory exist",
       );
     });
 
@@ -834,6 +854,70 @@ describe.sequential("DeepSeek Harness provider", () => {
       expect(Date.now() - started).toBeLessThan(3_000);
     });
   });
+
+  it("names the working directory when a spawn path is missing", async () => {
+    const resources = new Set<ConnectorResource>();
+    const cwd = join(testRoot, "missing-workspace");
+    const error = await createDshAcpStream({
+      cwd, env: { DSH_PASEO_COMMAND: fakeDsh }, resources,
+    }).then(
+      () => { throw new Error("Expected missing-directory failure"); },
+      (cause: unknown) => cause,
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain(cwd);
+    expect((error as Error).message).toContain("Check that both the executable and working directory exist");
+    expect(resources.size).toBe(0);
+  });
+
+  it("redacts JSON credential fields from public-provider startup diagnostics", async () => {
+    await withEnvironment(
+      {
+        DSH_FAKE_VERSION: "0.1.5-rc.3",
+        DSH_FAKE_VERSION_STDERR: '{"apiKey":"review-secret","reason":"synthetic diagnostic"}',
+      },
+      async () => {
+        const provider = createDeepSeekHarnessProvider();
+        try {
+          const error = await provider.connect(connectRequest()).then(
+            () => { throw new Error("Expected unsupported-version failure"); },
+            (cause: unknown) => cause,
+          );
+          expect(error).toBeInstanceOf(Error);
+          expect((error as Error).message).toContain("Unsupported DeepSeek Harness version");
+          expect((error as Error).message).toContain("[redacted]");
+          expect((error as Error).message).not.toContain("review-secret");
+          expect((error as Error).message).toContain("synthetic diagnostic");
+        } finally {
+          await provider.dispose();
+        }
+      },
+    );
+  });
+
+  it("reports a hung version probe as a timeout, not its cleanup signal", async () => {
+    const logPath = join(testRoot, "version-timeout.log");
+    await writeFile(logPath, "");
+    await withEnvironment(
+      { DSH_FAKE_HANG_VERSION: "1", DSH_FAKE_SPAWN_LOG: logPath },
+      async () => {
+        const provider = createDeepSeekHarnessProvider();
+        try {
+          await expect(provider.connect(connectRequest())).rejects.toThrow(
+            "version probe timed out after 5000ms",
+          );
+          const records = await waitForFakeSpawnLog(logPath, (current) =>
+            current.some((record) => record.event === "exit"),
+          );
+          expect(records.filter((record) => record.event === "start")).toHaveLength(1);
+          expect(records.find((record) => record.event === "start")?.args).toEqual(["--version"]);
+          expect(records.filter((record) => record.event === "exit")).toHaveLength(1);
+        } finally {
+          await provider.dispose();
+        }
+      },
+    );
+  }, 10_000);
 
   it("closes a version probe that is still waiting and does not spawn afterward", async () => {
     const resources = new Set<ConnectorResource>();

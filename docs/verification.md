@@ -6,6 +6,12 @@
 
 ## Layers of evidence
 
+The beta.1 baseline below had 19 automated cases. The separate
+[beta.2 code review](code-review.md) passes typecheck/lint and **32 tests** after
+diagnostic fixes and missing-coverage additions. Its new failures use synthetic
+processes/strings; the real-inference evidence below was established in beta.1,
+not silently reclassified as a fresh beta.2 API or native-client run.
+
 | Layer | Evidence |
 | --- | --- |
 | Public SDK + fake ACP process | `npm run check` passed: typecheck, lint with zero warnings/errors, **19 tests / 2 files**. Catalog/model/thinking IDs, config changes, multiple turns, persistence, complete output, MCP/image frames, allow/deny permissions, cancellation/errors/EOF, concurrent cwd/env isolation and closure during version probe/initialize/prompt. |
