@@ -189,14 +189,14 @@ provider-specific commands, steering, transcript replay, or its own plan/
 terminal UI surfaces; those are not claimed by this plugin. Credentials and
 private session contents are not stored in the repository.
 
-## Catalog candidate
+## Community catalog
 
-docs/catalog-entry.json is a candidate community-catalog entry for
-geoqiao/paseo-deepseek-harness. It calls out the beta status, exact tested
-DSH versions, no-transcript-replay persistence behavior, unsupported ACP
-surfaces, the backend-versus-client verification boundary, and daemon Node
-requirement. Its category is the singular `provider`. Catalog submission and
-publication are separate maintainer actions.
+Submitted to paseo.cafe in [PR #87](https://github.com/paseo-cafe/paseo-cafe/pull/87).
+**Pending maintainer review — not yet accepted or listed.** The entry uses the
+`provider` category and flags prerequisites, beta compatibility, safety,
+persistence semantics, unsupported surfaces and verification limits. Its source
+is [docs/catalog-entry.json](docs/catalog-entry.json); publication of this plugin
+and acceptance into the community catalog are separate actions.
 
 ## License
 
