@@ -348,7 +348,24 @@ async function handshakeStart(transport: MemoryTransport): Promise<{
 }
 
 describe("DeepSeek Harness launch guards", () => {
+  it.each([
+    '{"apiKey":"review-secret","safe":"kept"}',
+    '{"DEEPSEEK_API_KEY":"review-secret"}',
+    "API key: review-secret",
+    "'token': 'review-secret'",
+    JSON.stringify({ password: 'escaped " quote: review-secret' }),
+  ])("redacts quoted or spaced credential labels: %s", (input) => {
+    const diagnostic = redactDiagnostic(input);
+    expect(diagnostic).toContain("[redacted]");
+    expect(diagnostic).not.toContain("review-secret");
+  });
+
   it("recognizes only the tested DSH release versions", () => {
+    expect(extractDshVersion("dsh 0.1.6")).toBe("0.1.6");
+    expect(isSupportedDshVersion("0.1.6")).toBe(false);
+    expect(extractDshVersion("dsh 0.1.5-rc.2+custom.1")).toBe("0.1.5-rc.2+custom.1");
+    expect(isSupportedDshVersion(extractDshVersion("dsh 0.1.5-rc.2+custom.1"))).toBe(false);
+    expect(extractDshVersion("0.1.5-rc.2_not-a-version")).toBeUndefined();
     expect(extractDshVersion("dsh 0.1.5-rc.1")).toBe("0.1.5-rc.1");
     expect(extractDshVersion("version: 0.1.5-rc.2\n")).toBe("0.1.5-rc.2");
     expect(isSupportedDshVersion("0.1.5-rc.1")).toBe(true);

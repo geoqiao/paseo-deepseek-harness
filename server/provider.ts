@@ -32,7 +32,6 @@ interface InputContext {
 interface ConnectionScope extends InputContext {
   resources: Set<ConnectorResource>;
   closed: boolean;
-  connection?: ProviderConnection;
   closeConnection?: () => Promise<void>;
   closePromise?: Promise<void>;
   resourceClosePromise?: Promise<void>;
@@ -154,7 +153,6 @@ export function createDeepSeekHarnessProvider(
       throw error;
     }
 
-    scope.connection = connection;
     scope.closeConnection = () => closeScope(scope, connection);
     if (disposed || scope.closed) {
       scope.closed = true;

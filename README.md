@@ -6,7 +6,7 @@ A community-maintained Paseo 0.8 provider plugin, not a replacement agent loop
 or an official DeepSeek/Paseo endorsement. It runs `dsh --profile acp`; Paseo
 owns the chat UI. No custom client surface or patched Paseo app is required.
 
-[Install](#install-prerequisites) · [Compatibility](#acp-compatibility-and-limitations) · [Verification](docs/verification.md)
+[Install](#install-prerequisites) · [Compatibility](#acp-compatibility-and-limitations) · [Verification](docs/verification.md) · [Code review](docs/code-review.md)
 
 > [!IMPORTANT]
 > **Requirements:** Paseo 0.8.x, daemon Node.js 22.19.0 or newer, and a
@@ -24,7 +24,7 @@ owns the chat UI. No custom client surface or patched Paseo app is required.
 - Presents DSH's live model and reasoning-effort options without rewriting
   their wire IDs. DSH model IDs are opaque JSON strings.
 - Passes configured MCP servers, images, environment variables and working
-  directories to each child process.
+  directories to DSH session runtimes.
 - Keeps complete raw tool output. The adapter maps an ACP tool update whose
   output is represented by typed content blocks, but has no rawOutput, to
   rawOutput: { content: ... } without flattening or truncating it.
@@ -46,7 +46,7 @@ See the [official model configuration guide](https://github.com/deepseek-ai/deep
 
 The plugin does not download, install, update or restart DSH. DSH itself owns
 credentials and provider configuration. Credentials may be supplied through
-DSH's normal configuration or environment; the plugin does not read keys,
+DSH's normal configuration or environment; the plugin does not read DSH credential files,
 mirror sessions, or read private DSH transcripts.
 
 By default the plugin resolves the executable as `dsh`. Set
@@ -55,8 +55,9 @@ another installation; setting it only in an unrelated terminal does not update
 a running desktop-managed daemon. This is a path, not a shell command string.
 `DSH_PASEO_PROFILE` defaults to `acp`; any override must still expose the ACP
 stdio protocol, not the web/TUI profile. Custom profiles are untested.
-The child receives the daemon environment merged with per-session Paseo
-environment overrides, so variables such as `DSH_HOME` are preserved.
+Capability/catalog/session-list probes use the daemon environment. Session runtimes
+receive that environment merged with per-session Paseo overrides, so variables
+such as `DSH_HOME` are preserved for the session.
 The parent process environment is never mutated.
 
 The verified runtime compositions use CLI 0.1.5-rc.1 or 0.1.5-rc.2 with
@@ -111,7 +112,7 @@ Review this trusted, unsandboxed plugin and install the directory or public
 repository on the intended daemon. For a repository installation:
 
 ~~~sh
-paseo plugin add geoqiao/paseo-deepseek-harness --ref v0.1.0-beta.1 --host <your-host>
+paseo plugin add geoqiao/paseo-deepseek-harness --ref v0.1.0-beta.2 --host <your-host>
 paseo plugin ls --host <your-host>
 ~~~
 
@@ -181,9 +182,11 @@ Separately, an installed macOS Paseo 0.8.0 daemon completed real turns and kept
 tool-output tails, prior displayed history and DSH context through a plugin
 disable/enable cycle. An initial host IPC shutdown race was fixed by explicit
 async cleanup ownership; the repeated installed cycle had no new IPC errors,
-and the following real turn retained context and history. The **19-test** suite
+and the following real turn retained context and history. The current **32-test** suite
 includes pending-connect and close-ordering regressions; exact evidence is
 tracked in [verification](docs/verification.md).
+The [post-release review](docs/code-review.md) adds diagnostic-redaction, timeout,
+missing-workspace and defensive-input regressions without changing the ACP mappings.
 These are backend tests, not a desktop UI matrix or mobile-device test. Official DSH does not provide raw token deltas,
 provider-specific commands, steering, transcript replay, or its own plan/
 terminal UI surfaces; those are not claimed by this plugin. Credentials and
